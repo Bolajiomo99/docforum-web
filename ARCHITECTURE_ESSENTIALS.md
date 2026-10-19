@@ -264,6 +264,46 @@ assumed and mirrored in `models.ts` under "Phase W6 — Feature flags console".
   - Approaching deadline warnings: prominent alerts when held escrow refund deadline is < 48 hours away and order is unfulfilled (Threat Model T8 compliance).
   - Direct explorer links to Stellar testnet transactions (`https://stellar.expert/explorer/testnet/tx/...`).
 
+### Phase W4 — API keys & webhooks for facility integrations (issue #55, depends on docforum-core#125/#126)
+
+docforum-core#125 (API keys with HMAC request signing) and #126 (signed
+outbound webhooks) haven't landed, so every shape below is assumed. They're
+mirrored in `models.ts` under "Phase W4 — API keys & webhooks".
+
+- `GET /facilities/:facilityId/api-keys` → `FacilityApiKey[]` — active and
+  revoked keys; the full secret is never returned, only `prefix`.
+  `FacilityApiKey` = `{id, facilityId, name, prefix, scopes, lastUsedAt,
+  revokedAt, createdAt}`.
+- `POST /facilities/:facilityId/api-keys` (body: `{name, scopes?}`) →
+  `CreatedApiKey` — the **only** response carrying the full `secret`. The
+  client never writes it to storage, and drops it from the mutation cache
+  and the DOM when the dialog closes.
+- `DELETE /facilities/:facilityId/api-keys/:keyId` → `{success, keyId}` —
+  keys are revoked (kept with `revokedAt` for audit), not hard-deleted.
+- `GET /facilities/:facilityId/webhooks` → `WebhookEndpoint[]` —
+  `WebhookEndpoint` = `{id, facilityId, url, events, secretPrefix, active,
+  lastDeliveryAt, createdAt, updatedAt}`.
+- `POST /facilities/:facilityId/webhooks` (body: `{url, events}`) →
+  `CreatedWebhookEndpoint` — the only response carrying `signingSecret`
+  (HMAC-SHA256); same one-time-display rule as API key secrets.
+- `DELETE /facilities/:facilityId/webhooks/:endpointId` →
+  `{success, endpointId}`.
+- `GET /facilities/:facilityId/webhooks/:endpointId/deliveries` →
+  `WebhookDelivery[]`, newest first. `WebhookDelivery` = `{id, endpointId,
+  event, status: 'pending'|'success'|'failed', responseStatusCode,
+  errorMessage, attemptCount, deliveredAt, createdAt}`.
+- `POST /facilities/:facilityId/webhooks/:endpointId/test` →
+  `WebhookDelivery` — records and returns the test delivery.
+- `POST /facilities/:facilityId/webhooks/:endpointId/deliveries/:deliveryId/redeliver`
+  → `{deliveryId, status}`.
+- Event names assumed: `order.created`, `order.assigned`, `order.fulfilled`,
+  `order.cancelled`, `payment.released`, `payment.refunded`.
+- **Owner-only:** all endpoints are facility-scoped and expected to reject
+  non-owner staff server-side; the page shows a notice outside the facility
+  role. React Query keys are namespaced by `['facility', facilityId, …]`.
+- **Secrets:** full secrets are never put in query cache, `localStorage`,
+  `sessionStorage`, URLs or logs. Only prefixes are listed.
+
 ## Roadmap / status
 See `ROADMAP.md` in this repo, and Phase 7 in `docforum-core`'s
 `ROADMAP.md` for the original (pre-split) frontend phase this was carved

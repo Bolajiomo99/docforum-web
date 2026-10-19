@@ -13,6 +13,7 @@ import type {
   DataExport,
   Dependent,
   DoctorPracticeInsights,
+  FacilityApiKey,
   FacilityInvite,
   FacilityMember,
   FacilityWithDistance,
@@ -23,6 +24,8 @@ import type {
   RunningDelay,
   User,
   WalletLink,
+  WebhookDelivery,
+  WebhookEndpoint,
 } from '../types/models';
 
 // --- Personas (one per role the dev panel can switch to) --------------------
@@ -83,6 +86,9 @@ export interface MockDb {
   facilityMembers: FacilityMember[];
   facilityInvites: FacilityInvite[];
   fulfillmentQueue: FulfillmentQueueItem[];
+  apiKeys: FacilityApiKey[];
+  webhookEndpoints: WebhookEndpoint[];
+  webhookDeliveries: WebhookDelivery[];
   walletLink: WalletLink | null;
   paymentIntents: PaymentIntent[];
   consultationAddenda: ConsultationAddendum[]; // flattened, noteId-keyed lookups below
@@ -591,6 +597,68 @@ export function createSeedDb(): MockDb {
     },
   ];
 
+  const apiKeys: FacilityApiKey[] = [
+    {
+      id: 'key-demo-1',
+      facilityId: FACILITY_ID,
+      name: 'Demo Lab Information System (fake)',
+      prefix: 'df_live_demo1234',
+      scopes: ['orders.read', 'orders.write'],
+      lastUsedAt: '2026-10-18T08:00:00.000Z',
+      revokedAt: null,
+      createdAt: '2026-09-20T09:00:00.000Z',
+    },
+    {
+      id: 'key-demo-2',
+      facilityId: FACILITY_ID,
+      name: 'Demo Inventory Sync (fake)',
+      prefix: 'df_live_demo5678',
+      scopes: [],
+      lastUsedAt: null,
+      revokedAt: null,
+      createdAt: '2026-10-01T09:00:00.000Z',
+    },
+  ];
+
+  const webhookEndpoints: WebhookEndpoint[] = [
+    {
+      id: 'whk-demo-1',
+      facilityId: FACILITY_ID,
+      url: 'https://lab.example.test/webhooks/docforum',
+      events: ['order.created', 'order.assigned', 'order.fulfilled'],
+      secretPrefix: 'whsec_demo',
+      active: true,
+      lastDeliveryAt: '2026-10-18T08:05:00.000Z',
+      createdAt: '2026-09-20T09:00:00.000Z',
+      updatedAt: '2026-10-10T09:00:00.000Z',
+    },
+  ];
+
+  const webhookDeliveries: WebhookDelivery[] = [
+    {
+      id: 'whd-demo-1',
+      endpointId: 'whk-demo-1',
+      event: 'order.created',
+      status: 'success',
+      responseStatusCode: 200,
+      errorMessage: null,
+      attemptCount: 1,
+      deliveredAt: '2026-10-18T08:05:00.000Z',
+      createdAt: '2026-10-18T08:05:00.000Z',
+    },
+    {
+      id: 'whd-demo-2',
+      endpointId: 'whk-demo-1',
+      event: 'order.fulfilled',
+      status: 'failed',
+      responseStatusCode: 500,
+      errorMessage: 'Mock API: simulated 500 from receiver',
+      attemptCount: 3,
+      deliveredAt: null,
+      createdAt: '2026-10-17T12:00:00.000Z',
+    },
+  ];
+
   const walletLink: WalletLink = {
     id: 'wln-demo-1',
     facilityId: FACILITY_ID,
@@ -598,7 +666,6 @@ export function createSeedDb(): MockDb {
     createdAt: '2026-09-20T09:00:00.000Z',
     updatedAt: '2026-09-20T09:00:00.000Z',
   };
-
   const paymentIntents: PaymentIntent[] = [
     {
       id: 'pin-demo-1',
@@ -658,6 +725,9 @@ export function createSeedDb(): MockDb {
     facilityMembers,
     facilityInvites,
     fulfillmentQueue,
+    apiKeys,
+    webhookEndpoints,
+    webhookDeliveries,
     walletLink,
     paymentIntents,
     consultationAddenda,
