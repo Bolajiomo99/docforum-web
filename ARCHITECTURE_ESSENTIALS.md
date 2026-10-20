@@ -183,6 +183,17 @@ Undo behaviour: start/complete are applied optimistically and can be reverted wi
 - `GET /facilities/:facilityId/fulfillment-queue` → `FulfillmentQueueItem[]` — queue items with action attribution (`attribution: { action, performedByUserId, performedByName, performedByRole, timestamp, notes }`).
 - `POST /facilities/:facilityId/fulfillment-queue/:itemId/action` (body: `{action: 'fulfilled' | 'rejected', notes?}`) → `FulfillmentQueueItem` — records the acting staff user's identity and role for PRD §7 audit trail.
 
+### Phase W4 — Partial fulfilment (issue #54, depends on docforum-core#73)
+These shapes are **assumed** until `docforum-core#73` lands. All calls still go through `docforum-core` (hard rule 1). The UI never computes escrow releases; it renders `payment.rule` verbatim.
+
+- `GET /orders/mine` → `PatientOrder[]` and `GET /orders/:orderId` → `PatientOrder` — patient-scoped list/detail with item-level rows.
+- `OrderItem` mirrors: `{id, orderId, name, instructions?, quantityPrescribed, quantityDispensed, quantityOutstanding, unit, status: 'pending'|'partially_dispensed'|'dispensed'|'dispensed_elsewhere'|'rejected', dispensedByFacilityId?, dispensedByFacilityName?, dispensedAt?, routedToFacilityId?, routedToFacilityName?, canDispense, blockedReason?}`.
+- `PatientOrder.fulfillmentStatus` is derived by the backend from item rows: `unfulfilled` | `partially_fulfilled` | `fulfilled` | `rejected`. The frontend also has a defensive derivation helper for queue rows.
+- `GET /orders/:orderId/remaining-items/facilities?itemIds=<csv>` → `FacilityWithDistance[]` — facilities qualified for **only** the outstanding items, excluding the order's current facility.
+- `POST /orders/:orderId/route-remaining` (body: `{facilityId, itemIds}`) → `PatientOrder` — routes outstanding quantities to a second facility; the destination gets its own fulfillment queue rows. A `409` means another facility already dispensed (or another client already routed) an item.
+- `POST /facilities/:facilityId/fulfillment-queue/:itemId/dispense` (body: `{quantity}`) → `FulfillmentQueueItem` — item-level partial dispensing. The backend owns quantity validation (whole numbers, ≤ outstanding) and must return `409` for dispensed-elsewhere/already-routed items. Queue items may carry `orderItemId` to link the facility row back to the patient's order item.
+- `OrderPaymentSummary` (assumed): `{status: 'held'|'partially_released'|'released'|'refunded'|'none', heldStroops, releasedStroops, refundedStroops, rule}`. `rule` is plain language from the backend; the patient/facility UIs explain assumptions but do not decide release amounts (pending #73).
+
 ### Phase W6 — Admin audit & access log viewer (issue #71)
 
 #### State-change events — real, docforum-core#43 (see its `docs/api/README.md` "Audit trail")

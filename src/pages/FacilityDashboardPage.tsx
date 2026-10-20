@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/auth-store';
 import { WalletLinkForm } from '../features/payments/components/WalletLinkForm';
-import { FulfillmentQueueWithAttribution } from '../features/facility-team/components/FulfillmentQueueWithAttribution';
+import { FacilityFulfillmentQueue } from '../features/fulfillment/components/FacilityFulfillmentQueue';
+import { useDispenseFulfillmentItem } from '../features/fulfillment/hooks/useFulfillment';
 import { useFulfillmentQueue, useUpdateFulfillmentItem } from '../features/facility-team/hooks/useFacilityTeam';
 import type { FulfillmentQueueItem } from '../types/models';
 import styles from '../features/facility-team/components/FacilityTeam.module.css';
@@ -17,8 +18,13 @@ export const DEFAULT_MOCK_QUEUE: FulfillmentQueueItem[] = [
     patientProfileId: 'pat-1',
     itemName: 'Amoxicillin 500mg (30 capsules)',
     instructions: 'Take 1 capsule three times daily with meals for 10 days.',
-    status: 'fulfilled',
+    status: 'partially_dispensed',
     receivedAt: '2026-10-18T08:30:00Z',
+    quantityPrescribed: 30,
+    quantityDispensed: 20,
+    quantityOutstanding: 10,
+    unit: 'capsules',
+    canDispense: true,
     attribution: {
       action: 'dispensed',
       performedByUserId: 'user-owner-1',
@@ -40,6 +46,11 @@ export const DEFAULT_MOCK_QUEUE: FulfillmentQueueItem[] = [
     instructions: '12-hour fasting venous blood sample required.',
     status: 'fulfilled',
     receivedAt: '2026-10-18T09:00:00Z',
+    quantityPrescribed: 1,
+    quantityDispensed: 1,
+    quantityOutstanding: 0,
+    unit: 'sample',
+    canDispense: false,
     attribution: {
       action: 'sample_collected',
       performedByUserId: 'user-staff-1',
@@ -61,6 +72,11 @@ export const DEFAULT_MOCK_QUEUE: FulfillmentQueueItem[] = [
     instructions: 'Take 1 tablet twice daily with food.',
     status: 'pending',
     receivedAt: '2026-10-18T10:30:00Z',
+    quantityPrescribed: 60,
+    quantityDispensed: 0,
+    quantityOutstanding: 60,
+    unit: 'tablets',
+    canDispense: true,
     attribution: null,
   },
 ];
@@ -71,11 +87,25 @@ export function FacilityDashboardPage() {
 
   const { data: queueData } = useFulfillmentQueue(facilityId);
   const updateMutation = useUpdateFulfillmentItem(facilityId);
+  const dispenseMutation = useDispenseFulfillmentItem(facilityId);
 
   // Use local state if user performs actions in-session
   const [localQueue, setLocalQueue] = useState<FulfillmentQueueItem[] | null>(null);
+  const [dispenseError, setDispenseError] = useState<string | null>(null);
 
   const displayQueue: FulfillmentQueueItem[] = localQueue ?? queueData ?? DEFAULT_MOCK_QUEUE;
+
+  const handleDispense = async (itemId: string, quantity: number) => {
+    setDispenseError(null);
+    try {
+      await dispenseMutation.mutateAsync({ itemId, quantity });
+    } catch (error) {
+      setDispenseError(
+        error instanceof Error ? error.message : 'Could not dispense this item. Try again.',
+      );
+      throw error;
+    }
+  };
 
   const handleQueueAction = async (itemId: string, action: 'fulfilled' | 'rejected') => {
     try {
@@ -131,10 +161,13 @@ export function FacilityDashboardPage() {
         </div>
       </div>
 
-      <FulfillmentQueueWithAttribution
+      <FacilityFulfillmentQueue
         items={displayQueue}
-        onAction={handleQueueAction}
-        isUpdating={updateMutation.isPending}
+        onDispense={handleDispense}
+        onReject={(itemId) => handleQueueAction(itemId, 'rejected')}
+        isDispensing={dispenseMutation.isPending}
+        isRejecting={updateMutation.isPending}
+        errorMessage={dispenseError}
       />
 
       <WalletLinkForm />

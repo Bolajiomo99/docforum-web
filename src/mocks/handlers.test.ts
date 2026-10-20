@@ -20,6 +20,8 @@ import * as facilityService from '../services/facility-service';
 import * as facilityTeamService from '../services/facility-team-service';
 import * as healthService from '../services/health-profile-service';
 import * as insightsService from '../services/insights-service';
+import * as fulfillmentService from '../services/fulfillment-service';
+import * as ordersService from '../services/orders-service';
 import * as messagingService from '../services/messaging-service';
 import * as paymentsService from '../services/payments-service';
 import * as queueService from '../services/queue-service';
@@ -291,7 +293,7 @@ describe('facility finder', () => {
       { lat: 6.5244, lng: 3.3792 },
       MOCK_ACCESS_TOKEN,
     );
-    expect(nearby[0].id).toBe('fac-demo-pharmacy');
+    expect(nearby[0].id).toBe('fac-main');
     expect(nearby[0].distanceKm).toBeLessThan(0.1);
   });
 });
@@ -332,7 +334,7 @@ describe('facility team', () => {
 
   it('fulfills queue items with attribution', async () => {
     const queue = await facilityTeamService.getFulfillmentQueue(FACILITY_ID, MOCK_ACCESS_TOKEN);
-    expect(queue).toHaveLength(3);
+    expect(queue).toHaveLength(5);
 
     const updated = await facilityTeamService.updateFulfillmentItem(
       FACILITY_ID,
@@ -344,6 +346,112 @@ describe('facility team', () => {
     expect(updated.status).toBe('fulfilled');
     expect(updated.attribution?.performedByRole).toBe('owner');
     expect(updated.attribution?.action).toBe('dispensed');
+  });
+});
+
+describe('partial fulfilment', () => {
+  it('lists patient orders with item-level outstanding quantities', async () => {
+    const orders = await ordersService.listMyOrders(MOCK_ACCESS_TOKEN);
+    expect(orders).toHaveLength(3);
+
+    const order = await ordersService.getOrder('ord-demo-rx-1', MOCK_ACCESS_TOKEN);
+    expect(order.fulfillmentStatus).toBe('partially_fulfilled');
+    expect(order.items.find((i) => i.id === 'itm-demo-rx1-amox')).toMatchObject({
+      quantityPrescribed: 30,
+      quantityDispensed: 20,
+      quantityOutstanding: 10,
+      status: 'partially_dispensed',
+    });
+    expect(order.items.find((i) => i.id === 'itm-demo-rx1-cet')?.status).toBe(
+      'dispensed_elsewhere',
+    );
+  });
+
+  it('dispenses a partial quantity, syncs the order, and rejects over-dispensing', async () => {
+    const dispensed = await fulfillmentService.dispenseFulfillmentItem(
+      FACILITY_ID,
+      'fuq-demo-1',
+      { quantity: 5 },
+      MOCK_ACCESS_TOKEN,
+    );
+    expect(dispensed.quantityDispensed).toBe(25);
+    expect(dispensed.quantityOutstanding).toBe(5);
+    expect(dispensed.status).toBe('partially_dispensed');
+
+    const order = await ordersService.getOrder('ord-demo-rx-1', MOCK_ACCESS_TOKEN);
+    expect(order.items.find((i) => i.id === 'itm-demo-rx1-amox')).toMatchObject({
+      quantityDispensed: 25,
+      quantityOutstanding: 5,
+      status: 'partially_dispensed',
+    });
+
+    await expect(
+      fulfillmentService.dispenseFulfillmentItem(
+        FACILITY_ID,
+        'fuq-demo-1',
+        { quantity: 6 },
+        MOCK_ACCESS_TOKEN,
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('routes remaining items to another qualified facility and locks the original item once dispensed', async () => {
+    const facilities = await ordersService.getEligibleFacilitiesForRemainingItems(
+      'ord-demo-rx-1',
+      ['itm-demo-rx1-amox', 'itm-demo-rx1-vit'],
+      MOCK_ACCESS_TOKEN,
+    );
+    expect(facilities.map((f) => f.id)).toEqual(['fac-demo-pharmacy-2']);
+
+    const routed = await ordersService.routeRemainingItems(
+      'ord-demo-rx-1',
+      {
+        facilityId: 'fac-demo-pharmacy-2',
+        itemIds: ['itm-demo-rx1-amox', 'itm-demo-rx1-vit'],
+      },
+      MOCK_ACCESS_TOKEN,
+    );
+    expect(routed.items.find((i) => i.id === 'itm-demo-rx1-amox')).toMatchObject({
+      routedToFacilityId: 'fac-demo-pharmacy-2',
+      routedToFacilityName: 'Example Chemist (fake)',
+    });
+
+    const destinationQueue = await facilityTeamService.getFulfillmentQueue(
+      'fac-demo-pharmacy-2',
+      MOCK_ACCESS_TOKEN,
+    );
+    expect(destinationQueue.map((i) => i.orderItemId)).toEqual(
+      expect.arrayContaining(['itm-demo-rx1-amox', 'itm-demo-rx1-vit']),
+    );
+
+    const originalQueue = await facilityTeamService.getFulfillmentQueue(
+      FACILITY_ID,
+      MOCK_ACCESS_TOKEN,
+    );
+    expect(originalQueue.find((i) => i.orderItemId === 'itm-demo-rx1-amox')?.canDispense).toBe(
+      false,
+    );
+
+    const routedItem = destinationQueue.find((i) => i.orderItemId === 'itm-demo-rx1-amox');
+    await fulfillmentService.dispenseFulfillmentItem(
+      'fac-demo-pharmacy-2',
+      routedItem!.id,
+      { quantity: 10 },
+      MOCK_ACCESS_TOKEN,
+    );
+
+    const after = await facilityTeamService.getFulfillmentQueue(FACILITY_ID, MOCK_ACCESS_TOKEN);
+    expect(after.find((i) => i.orderItemId === 'itm-demo-rx1-amox')).toMatchObject({
+      status: 'dispensed_elsewhere',
+      canDispense: false,
+    });
+
+    const order = await ordersService.getOrder('ord-demo-rx-1', MOCK_ACCESS_TOKEN);
+    expect(order.items.find((i) => i.id === 'itm-demo-rx1-amox')).toMatchObject({
+      quantityDispensed: 30,
+      quantityOutstanding: 0,
+      status: 'dispensed',
+    });
   });
 });
 

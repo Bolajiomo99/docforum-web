@@ -402,7 +402,13 @@ export interface RemoveMemberResponse {
 }
 
 export type FulfillmentOrderType = 'prescription' | 'lab';
-export type FulfillmentItemStatus = 'pending' | 'in_progress' | 'fulfilled' | 'rejected';
+export type FulfillmentItemStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'partially_dispensed'
+  | 'fulfilled'
+  | 'dispensed_elsewhere'
+  | 'rejected';
 
 export interface FulfillmentActionAttribution {
   action: 'dispensed' | 'sample_collected' | 'verified' | 'rejected';
@@ -423,9 +429,95 @@ export interface FulfillmentQueueItem {
   patientProfileId: string;
   itemName: string;
   instructions?: string | null;
+  /** Links this facility queue row to the patient's order item. */
+  orderItemId?: string;
   status: FulfillmentItemStatus;
   receivedAt: string;
   attribution?: FulfillmentActionAttribution | null;
+  // --- Partial fulfilment (issue #54, docforum-core#73 assumed) -----------
+  quantityPrescribed?: number;
+  quantityDispensed?: number;
+  quantityOutstanding?: number;
+  unit?: string;
+  canDispense?: boolean;
+  blockedReason?: string | null;
+  dispensedByFacilityId?: string | null;
+  dispensedByFacilityName?: string | null;
+}
+
+// --- Phase W4 — Partial fulfilment (issue #54, depends on
+// docforum-core#73) ---------------------------------------------------------
+// Assumed contract: order-level status is derived from item-level rows.
+// The exact payment-release rule is backend-owned and pending #73; the UI
+// renders `payment.rule` rather than computing/guessing a release amount.
+
+export type PartialFulfillmentStatus =
+  | 'unfulfilled'
+  | 'partially_fulfilled'
+  | 'fulfilled'
+  | 'rejected';
+
+export type OrderItemFulfillmentStatus =
+  | 'pending'
+  | 'partially_dispensed'
+  | 'dispensed'
+  | 'dispensed_elsewhere'
+  | 'rejected';
+
+export interface OrderItem {
+  id: string;
+  orderId: string;
+  name: string;
+  instructions?: string | null;
+  quantityPrescribed: number;
+  quantityDispensed: number;
+  quantityOutstanding: number;
+  unit: string;
+  status: OrderItemFulfillmentStatus;
+  dispensedByFacilityId?: string | null;
+  dispensedByFacilityName?: string | null;
+  dispensedAt?: string | null;
+  routedToFacilityId?: string | null;
+  routedToFacilityName?: string | null;
+  /** Backend-derived: false once another facility dispensed or the
+   * remaining quantity was routed elsewhere. */
+  canDispense: boolean;
+  blockedReason?: string | null;
+}
+
+export interface OrderPaymentSummary {
+  status: 'held' | 'partially_released' | 'released' | 'refunded' | 'none';
+  heldStroops: string;
+  releasedStroops: string;
+  refundedStroops: string;
+  /** Plain-language rule supplied by docforum-core, shown verbatim. */
+  rule: string;
+}
+
+export interface PatientOrder {
+  id: string;
+  orderType: 'prescription' | 'lab_order';
+  patientProfileId: string;
+  patientName: string;
+  medicationOrTest: string;
+  instructions?: string | null;
+  issuedAt: string;
+  expiresAt: string;
+  status: 'active' | 'completed' | 'cancelled';
+  fulfillmentStatus: PartialFulfillmentStatus;
+  items: OrderItem[];
+  facilityId?: string | null;
+  facilityName?: string | null;
+  payment: OrderPaymentSummary;
+}
+
+export interface DispenseFulfillmentItemInput {
+  quantity: number;
+}
+
+export interface RouteRemainingItemsInput {
+  facilityId: string;
+  itemIds: string[];
 }
 
 // --- Phase W4 — Scan-to-verify orders (issue #52, docforum-core#71) ---
@@ -766,6 +858,8 @@ export interface Order {
   issuedAt: string;
   expiresAt: string;
   status: 'active' | 'completed' | 'cancelled';
+  fulfillmentStatus?: PartialFulfillmentStatus;
+  items?: OrderItem[];
 }
 
 export interface LabResult {
