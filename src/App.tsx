@@ -22,6 +22,7 @@ import { AdminSystemPage } from './pages/AdminSystemPage';
 import { AdminFlagsPage } from './pages/AdminFlagsPage';
 import { OrderVerifyPage } from './pages/OrderVerifyPage';
 import { FacilityPaymentsPage } from './pages/FacilityPaymentsPage';
+import { FacilityInsightsPage } from './pages/FacilityInsightsPage';
 import { PatientChartPage } from "./pages/PatientChartPage";
 
 export default function App() {
@@ -98,6 +99,14 @@ export default function App() {
           element={
             <RequireAuth allowedRoles={['facility']}>
               <FacilityTeamPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="facility/insights"
+          element={
+            <RequireAuth allowedRoles={['facility']}>
+              <FacilityInsightsPage />
             </RequireAuth>
           }
         />

@@ -264,6 +264,21 @@ assumed and mirrored in `models.ts` under "Phase W6 — Feature flags console".
   - Approaching deadline warnings: prominent alerts when held escrow refund deadline is < 48 hours away and order is unfulfilled (Threat Model T8 compliance).
   - Direct explorer links to Stellar testnet transactions (`https://stellar.expert/explorer/testnet/tx/...`).
 
+### Facility performance insights — turnaround times & rejection reasons (issue #57)
+Depends on the fulfilment queue (#51/#8) and an **aggregate** insights endpoint in
+`docforum-core`, which has not landed yet. The shape below is **assumed** and mirrored in
+`models.ts` under "Phase W4 — Facility Performance Insights". Reconcile when the backend
+endpoint lands.
+- `GET /facilities/:facilityId/insights?preset=&startDate=&endDate=` → `FacilityPerformanceInsights`.
+  - `FacilityPerformanceInsights = { facilityId, range, generatedAt, turnaround, volumeByDay, rejectionReasons, disputes }`.
+  - `turnaround`: `{ fulfilledCount, medianHours, p90Hours, minHours, maxHours, within1h, within4h, within24h, over24h, sampleSizeWarning }` — hours are fractional, the buckets are cumulative (`within1h ≤ within4h ≤ within24h`), and `over24h` is separate.
+  - `volumeByDay`: `{ date (YYYY-MM-DD), received, fulfilled, rejected }[]`.
+  - `rejectionReasons`: `{ code, label, count, percentage }[]`, `percentage` 0-100 of all rejections.
+  - `disputes`: `{ totalOrders, disputedOrders, disputeRate, resolvedInFacilityFavour, resolvedInPatientFavour, openDisputes, averageResolutionHours, sampleSizeWarning }`, `disputeRate` is disputes per 100 orders.
+- **Aggregate-only by contract (reviewer-critical):** this model deliberately carries **no patient identifiers, names, order ids or per-order rows** — only totals, rates and distributions. The mock handler test asserts the serialised payload contains no `patientName`/`patientProfileId`/order ids, but the real guarantee must come from the server: it must aggregate before responding and never return patient-level data.
+- **Small samples** (`fulfilledCount`/`totalOrders` below the server's threshold) set the `sampleSizeWarning` flags; the UI labels those cards as not representative.
+- **CSV export** is client-side only, serialising the aggregates already on screen — it never triggers additional fetches and reuses the audit CSV helpers (`escapeCsvCell` neutralises spreadsheet formulas).
+
 ## Roadmap / status
 See `ROADMAP.md` in this repo, and Phase 7 in `docforum-core`'s
 `ROADMAP.md` for the original (pre-split) frontend phase this was carved

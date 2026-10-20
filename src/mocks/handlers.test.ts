@@ -296,6 +296,40 @@ describe('facility finder', () => {
   });
 });
 
+describe('facility performance insights', () => {
+  it('returns aggregate-only insights and honours the date range', async () => {
+    const insights = await insightsService.getFacilityPerformanceInsights(
+      MOCK_ACCESS_TOKEN,
+      FACILITY_ID,
+      { preset: '30d' },
+    );
+    expect(insights.facilityId).toBe(FACILITY_ID);
+    expect(insights.range.preset).toBe('30d');
+    expect(insights.turnaround.fulfilledCount).toBeGreaterThan(0);
+    expect(insights.volumeByDay.length).toBe(7);
+    expect(insights.rejectionReasons.length).toBeGreaterThan(0);
+    expect(insights.disputes.totalOrders).toBeGreaterThan(0);
+
+    const custom = await insightsService.getFacilityPerformanceInsights(
+      MOCK_ACCESS_TOKEN,
+      FACILITY_ID,
+      { preset: 'custom', startDate: '2026-10-01', endDate: '2026-10-07' },
+    );
+    expect(custom.range).toMatchObject({ startDate: '2026-10-01', endDate: '2026-10-07' });
+  });
+
+  it('never leaks patient-level identifiers in the aggregate payload', async () => {
+    const insights = await insightsService.getFacilityPerformanceInsights(
+      MOCK_ACCESS_TOKEN,
+      FACILITY_ID,
+    );
+    const serialised = JSON.stringify(insights).toLowerCase();
+    expect(serialised).not.toContain('patientname');
+    expect(serialised).not.toContain('patientprofileid');
+    expect(serialised).not.toContain('ord-demo');
+  });
+});
+
 describe('facility team', () => {
   it('lists members and invites, and sends an invite', async () => {
     const members = await facilityTeamService.listFacilityMembers(FACILITY_ID, MOCK_ACCESS_TOKEN);

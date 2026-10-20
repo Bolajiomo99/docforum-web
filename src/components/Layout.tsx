@@ -56,6 +56,9 @@ export function Layout() {
                   <Link to="/facility/payments" className={styles.navLink}>
                     Payouts
                   </Link>
+                  <Link to="/facility/insights" className={styles.navLink}>
+                    Performance
+                  </Link>
                 </>
               )}
               {user.role === 'admin' && (
