@@ -12,6 +12,7 @@ import { facilityTeamHandlers } from './handlers/facility-team';
 import { featureFlagHandlers } from './handlers/feature-flags';
 import { eventHandlers } from './handlers/events';
 import { facilityHandlers } from './handlers/facility';
+import { facilitySettingsHandlers } from './handlers/facility-settings';
 import { healthProfileHandlers } from './handlers/health-profile';
 import { insightsHandlers } from './handlers/insights';
 import { integrationsHandlers } from './handlers/integrations';
@@ -37,6 +38,7 @@ export const handlers = [
   ...notificationHandlers,
   ...insightsHandlers,
   ...facilityHandlers,
+  ...facilitySettingsHandlers,
   ...facilityTeamHandlers,
   ...featureFlagHandlers,
   ...eventHandlers,
