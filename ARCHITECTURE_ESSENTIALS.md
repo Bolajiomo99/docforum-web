@@ -264,6 +264,23 @@ assumed and mirrored in `models.ts` under "Phase W6 — Feature flags console".
   - Approaching deadline warnings: prominent alerts when held escrow refund deadline is < 48 hours away and order is unfulfilled (Threat Model T8 compliance).
   - Direct explorer links to Stellar testnet transactions (`https://stellar.expert/explorer/testnet/tx/...`).
 
+### Facility settings — location, opening details & price list (issue #56, docforum-core#74/#127)
+Both `docforum-core` issues this depends on (#74 facility location/distance-sorted
+selection, #127 facility price lists used to price PaymentIntents) are still
+pending, so the shapes below are **assumed** and mirrored in `models.ts` under
+"Facility settings, location & price list". Reconcile once those land.
+- `GET /facilities/:facilityId/settings` → `FacilitySettings`
+  - `FacilitySettings` = `{facilityId, name, type, address, city, latitude, longitude, phone, email, openingHours, updatedAt}`.
+  - `openingHours` is always the full seven `Weekday` entries (`monday`…`sunday`), each `{day, closed, opensAt, closesAt}` where `opensAt`/`closesAt` are `HH:MM` local strings or `null` when closed.
+- `PATCH /facilities/:facilityId/settings` (body: `FacilitySettingsInput` = the editable subset `{address, city, latitude, longitude, phone, email, openingHours}`) → the saved `FacilitySettings`. Server is assumed to reject out-of-range coordinates (`latitude` −90…90, `longitude` −180…180) and missing required fields with `400`.
+- `GET /catalog/items?query=` → `CatalogItem[]`. `query` matches item name or code; empty query returns the catalog. `CatalogItem` = `{code, name, type, description?}` where `code` is the stable id stored on a `FacilityPrice`.
+- `GET /facilities/:facilityId/prices` → `FacilityPrice[]` (all versions, unordered). `FacilityPrice` = `{id, facilityId, catalogItemCode, catalogItemName, asset, amountStroops, effectiveFrom, createdAt}`.
+  - Price versions are immutable. The row effective latest on or before now is the *current* price; future rows are *scheduled*; older rows are *superseded*. `features/facility-settings/components/PriceListEditor.tsx` derives those labels client-side.
+- `POST /facilities/:facilityId/prices` (body: `FacilityPriceInput` = `{catalogItemCode, asset, amountStroops, effectiveFrom}`) → the created `FacilityPrice`. `amountStroops` is the raw BigInt-safe integer string (1 XLM/USDC = 10,000,000 stroops).
+- **Decimal handling:** amounts are entered as decimals (both assets settle to 7 decimals, `ASSET_DECIMALS`) and converted without floating point via `parseAssetAmount` in `features/facility-settings/validation.ts`; more than 7 decimals, negatives, zero and non-numeric input are rejected client-side before any request. The server is presumed to re-validate.
+- **Existing payments are never repriced (edge case):** changing a price creates a new version for *future* PaymentIntents only. Intents already created keep the amount snapshotted at creation time (docforum-core#127). The price-list UI states this explicitly, and no UI path here mutates an existing intent.
+- **Keyboard-accessible map alternative (edge case):** the map pin is a click-to-move convenience only; the always-visible latitude/longitude fields are the accessible alternative, and the map region's `aria-label` points users to them.
+
 ## Roadmap / status
 See `ROADMAP.md` in this repo, and Phase 7 in `docforum-core`'s
 `ROADMAP.md` for the original (pre-split) frontend phase this was carved
