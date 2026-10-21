@@ -11,6 +11,19 @@
 
 export type Role = 'patient' | 'doctor' | 'facility' | 'admin';
 
+// --- Session idle timeout (issue #82) — ASSUMED, not yet in docforum-core --
+// Shared clinical devices: the backend is expected to be able to push its
+// own per-role idle timeout, which takes precedence over the frontend
+// defaults. See ARCHITECTURE_ESSENTIALS.md "Known assumptions — Session
+// idle timeout".
+
+export interface SessionTimeoutSettings {
+  /** Idle minutes before the session is signed out. */
+  idleTimeoutMinutes: number;
+  /** Seconds of warning shown before the sign-out. */
+  warningSeconds: number;
+}
+
 /** Roles a user may self-register as. Facility accounts are admin-invited
  * only (PRD OQ-2) — there is deliberately no self-serve facility signup. */
 export type SelfServeRole = Extract<Role, 'patient' | 'doctor'>;
@@ -101,6 +114,57 @@ export interface ActingProfile {
   id: string;
   fullName: string;
   isSelf: boolean;
+}
+
+// --- Orders (Phase W2 in docforum-web, assumed contract against
+// docforum-core issue #71 / PRD §8.1.6 — see ARCHITECTURE_ESSENTIALS.md
+// "Known assumptions". Endpoints and field names are provisional until
+// docforum-core's order-token implementation lands.) -------------------
+
+/** Type of clinical order a doctor can issue. */
+export type OrderType = 'prescription' | 'lab_order';
+
+/** Order validity state as reported by docforum-core.
+ * - active:      Current, valid — show the scannable QR.
+ * - superseded:  A newer order replaced this one — hide the QR, explain.
+ * - expired:     Time-limited token has passed its validity window.
+ * - fulfilled:   Facility marked the order completed.
+ * - cancelled:   Order was cancelled by doctor or patient.
+ */
+export type OrderStatus = 'active' | 'superseded' | 'expired' | 'fulfilled' | 'cancelled';
+
+/** An individual line item on a lab order or prescription. */
+export interface OrderItem {
+  /** Human-readable name (e.g. "FBC" or "Amoxicillin 250mg"). */
+  name: string;
+  /** Directions or instructions (optional). */
+  note?: string;
+}
+
+/** Full detail of a patient order, as returned by docforum-core's
+ * `GET /orders/:id` endpoint. The `token` field is the opaque signed
+ * string that encodes into the QR code — never include order details
+ * in the QR, only the token itself (issue #25 constraint). */
+export interface Order {
+  id: string;
+  type: OrderType;
+  status: OrderStatus;
+  /** The signed, opaque token that facilities scan. Absent/null for
+   * non-active orders (superseded, expired) — the QR must not be shown
+   * when token is null. */
+  token: string | null;
+  items: OrderItem[];
+  /** ISO 8601 timestamp of when the order was issued. */
+  issuedAt: string;
+  /** ISO 8601 expiry timestamp (null if the order has no time limit). */
+  expiresAt: string | null;
+  /** The doctor who issued the order. */
+  doctorName: string; // assumed — not yet in schema.prisma
+  /** The facility the patient chose (null if not yet assigned). */
+  facilityName: string | null; // assumed — not yet in schema.prisma
+  patientProfileId: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // --- Payments (Phase 5.5 in docforum-core — real, not assumed. See that
@@ -941,17 +1005,6 @@ export interface CalendarFeedResponse {
 
 export interface RotateTokenResponse {
   icsUrl: string;
-}
-
-export interface Order {
-  id: string;
-  orderType: 'prescription' | 'lab_order';
-  patientName: string;
-  medicationOrTest: string;
-  instructions?: string | null;
-  issuedAt: string;
-  expiresAt: string;
-  status: 'active' | 'completed' | 'cancelled';
 }
 
 export interface LabResult {

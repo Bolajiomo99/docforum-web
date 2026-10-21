@@ -23,6 +23,21 @@ real API" (no refresh-on-reload flow).
   for all three roles (facility users just don't self-register). 14 tests
   passing (`npm test`), including one that asserts facility is never
   offered at signup.
+- [x] Idle timeout & automatic sign-out for shared devices. Tracked as
+  [issue #82](https://github.com/DocForum/docforum-web/issues/82)
+  (High, 200 pts) — `src/hooks/idle-timeout.ts` (pure timestamp logic) +
+  `src/hooks/useIdleTimeout.ts`, `SessionTimeoutWarning` /
+  `SessionTimeoutController` mounted in `Layout`. Timestamp-based
+  activity tracking (input, focus, visibility — never
+  interval-counting, so throttled background tabs stay correct), a
+  warning modal with "Stay signed in", cross-tab `BroadcastChannel`
+  coordination, and role-based defaults (patient 30 min, doctor/facility
+  15 min, admin 10 min) with a backend value taking precedence when
+  served. On timeout: API logout, ALL client state cleared, then
+  `/login?reason=idle-timeout` with an explanation. Unsaved form data is
+  flagged in the modal via `useUnsavedChangesWarning`. **Built against
+  assumed shape:** `GET /auth/session-timeout` (not in docforum-core) —
+  see `ARCHITECTURE_ESSENTIALS.md` "Known assumptions".
 - [ ] Restore session on reload via `POST /auth/refresh` (single-flight refresh, one retry on `401`, `RequireAuth` waits for boot refresh). Tracked as [issue #9](https://github.com/DocForum/docforum-web/issues/9) (Medium, 150 pts).
 - [ ] Not done: any integration test against a real `docforum-core`
   instance. Tracked as [issue #12](https://github.com/DocForum/docforum-web/issues/12) (High, 200 pts) — an end-to-end smoke test against a throwaway `docforum-core` backend.
@@ -39,6 +54,7 @@ real API" (no refresh-on-reload flow).
 - [ ] My appointments list. Tracked as [issue #3](https://github.com/DocForum/docforum-web/issues/3) (Trivial, 100 pts) — calls `docforum-core`'s real, already-implemented `GET /appointments/mine`, no assumption involved.
 - [ ] Referral accept/decline screen. Tracked as [issue #4](https://github.com/DocForum/docforum-web/issues/4) (Medium, 150 pts) — assumed contract against `docforum-core` issues #5–#8, not yet merged there.
 - [x] Orders list + facility-selection screen. Tracked as [issue #5](https://github.com/DocForum/docforum-web/issues/5) (Medium, 150 pts) — `src/features/orders/`, `OrdersPage` at `/patient/orders`. Lists every current prescription/lab order with superseded-version history derived from the supersedes chain (never "first record wins"), and lets the patient choose a fulfilling facility from only the capability-matched options docforum-core returns. Built against an assumed contract; see `ARCHITECTURE_ESSENTIALS.md` "Known assumptions — Phase W2".
+- [x] Order detail with verifiable QR code and print-friendly view. Tracked as [issue #25](https://github.com/DocForum/docforum-web/issues/25) (High, 200 pts) — **implemented**: `src/features/orders/`, `src/pages/OrderDetailPage.tsx`, routed at `/patient/orders/:orderId`. Built against an assumed `GET /orders/:id` + `GET /orders/mine` contract (docforum-core issue #71). See `ARCHITECTURE_ESSENTIALS.md` "Known assumptions".
 - [x] Health profile editor: allergies, conditions and current medications. Tracked as [issue #18](https://github.com/DocForum/docforum-web/issues/18) (High, 200 pts) — assumed contract against `docforum-core` issue #59.
 - [x] Dependents management for guardians. Tracked as [issue #19](https://github.com/DocForum/docforum-web/issues/19) (High, 200 pts) — assumed contract against `docforum-core` issue #42.
 - [x] Acting-for profile switcher: book and view records on behalf of a dependent. Tracked as [issue #20](https://github.com/DocForum/docforum-web/issues/20) (High, 200 pts) — client-only UI state (Zustand), threads `patientProfileId` through API calls and query keys.
@@ -358,6 +374,18 @@ Admin-only screens beyond payments. Everything goes through `docforum-core`'s ad
 - 2026-10-07 — Opened issues #10 (explorer links in the payments
   console), #11 (ESLint in CI) and #12 (end-to-end smoke test against a
   real `docforum-core`, the unchecked Phase W1 item).
+- 2026-10-15 — Implemented Phase W2 issue #25 (order detail with verifiable
+  QR code and print-friendly view): added `OrderType`/`OrderStatus`/`Order`/
+  `OrderItem` types to `src/types/models.ts` (assumed — see
+  `ARCHITECTURE_ESSENTIALS.md` "Known assumptions"), `orders-service.ts`,
+  `src/features/orders/` (hook + `OrderDetail` + `OrderQrCode` components +
+  CSS modules with `@media print` rules), and `src/pages/OrderDetailPage.tsx`
+  routed at `/patient/orders/:orderId`. QR code encoded client-side via
+  `qrcode@1.5.4` from the token string only (no order details in QR).
+  Superseded/expired/cancelled orders show an explanation instead of a QR;
+  active orders show a large scannable QR with a full-screen mode and a
+  print/PDF button. Global `.no-print` utility class added to `global.css`.
+  14 new component tests added; all 41 tests pass, typecheck and build green.
 - 2026-10-16 — Built Phase W2 patient features: dependents management
   (#19), acting-for profile switcher (#20), health profile editor (#18),
   and guardian consent/age-of-majority handover screens (#21). All four
