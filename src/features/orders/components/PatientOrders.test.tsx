@@ -50,7 +50,7 @@ describe('PatientOrdersList (#54)', () => {
 
 describe('PatientOrderDetail (#54)', () => {
   it('shows item quantities, the dispensed-elsewhere warning, and payment rule', async () => {
-    vi.mocked(ordersService.getOrder).mockResolvedValue(partialOrder);
+    vi.mocked(ordersService.getPatientOrder).mockResolvedValue(partialOrder);
     render(<PatientOrderDetail orderId={partialOrder.id} />);
 
     expect(
@@ -82,7 +82,7 @@ describe('PatientOrderDetail (#54)', () => {
           : item,
       ),
     };
-    vi.mocked(ordersService.getOrder).mockResolvedValue(partialOrder);
+    vi.mocked(ordersService.getPatientOrder).mockResolvedValue(partialOrder);
     vi.mocked(ordersService.getEligibleFacilitiesForRemainingItems).mockResolvedValue([
       eligibleFacility,
     ]);
@@ -113,7 +113,7 @@ describe('PatientOrderDetail (#54)', () => {
   });
 
   it('explains a 409 when items were dispensed elsewhere before routing', async () => {
-    vi.mocked(ordersService.getOrder).mockResolvedValue(partialOrder);
+    vi.mocked(ordersService.getPatientOrder).mockResolvedValue(partialOrder);
     vi.mocked(ordersService.getEligibleFacilitiesForRemainingItems).mockResolvedValue([
       eligibleFacility,
     ]);
