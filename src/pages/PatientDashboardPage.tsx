@@ -11,6 +11,8 @@ import { FacilityFinderPage } from './FacilityFinderPage';
 import { CareThreadPage } from './CareThreadPage';
 import { OrdersPage } from './OrdersPage';
 import { OrderDetailPage } from './OrderDetailPage';
+import { PatientOrdersPage } from './PatientOrdersPage';
+import { PatientOrderDetailPage } from './PatientOrderDetailPage';
 import { MessageThreadPage } from './MessageThreadPage';
 import styles from './PatientDashboardPage.module.css';
 

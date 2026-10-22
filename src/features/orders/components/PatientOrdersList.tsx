@@ -19,8 +19,9 @@ export function orderTypeLabel(order: PatientOrder): string {
 }
 
 export function orderItemSummary(order: PatientOrder): string {
-  const total = order.items.length;
-  const outstanding = order.items.filter((item) => item.quantityOutstanding > 0).length;
+  const items = order.items ?? [];
+  const total = items.length;
+  const outstanding = items.filter((item) => item.quantityOutstanding > 0).length;
   if (total === 1) return '1 item';
   if (outstanding > 0) return `${total} items · ${outstanding} still outstanding`;
   return `${total} items`;
@@ -72,7 +73,7 @@ export function PatientOrdersList() {
                     {order.facilityName ? ` · ${order.facilityName}` : ''}
                   </p>
                 </div>
-                <FulfillmentStatusBadge status={order.fulfillmentStatus} />
+                <FulfillmentStatusBadge status={order.fulfillmentStatus ?? 'unfulfilled'} />
               </div>
 
               <p className={styles.orderSummary}>{orderItemSummary(order)}</p>

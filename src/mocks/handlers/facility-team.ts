@@ -11,9 +11,10 @@ import type {
 } from '../../types/models';
 
 function deriveOrderStatus(order: PatientOrder): PatientOrder['fulfillmentStatus'] {
-  if (order.items.every((item) => item.status === 'rejected')) return 'rejected';
-  if (order.items.every((item) => item.quantityOutstanding <= 0)) return 'fulfilled';
-  if (order.items.some((item) => item.quantityDispensed > 0)) return 'partially_fulfilled';
+  const items = order.items ?? [];
+  if (items.every((item) => item.status === 'rejected')) return 'rejected';
+  if (items.every((item) => item.quantityOutstanding <= 0)) return 'fulfilled';
+  if (items.some((item) => item.quantityDispensed > 0)) return 'partially_fulfilled';
   return 'unfulfilled';
 }
 
@@ -26,7 +27,7 @@ function syncOrderItem(
   if (!item.orderItemId) return;
   const order = db.orders.find((o) => o.id === item.orderId);
   if (!order) return;
-  const orderItem = order.items.find((i) => i.id === item.orderItemId);
+  const orderItem = (order.items ?? []).find((i) => i.id === item.orderItemId);
   if (!orderItem) return;
 
   orderItem.quantityDispensed = Math.min(
@@ -254,7 +255,7 @@ export const facilityTeamHandlers = [
         );
       } else if (item.orderItemId) {
         const order = db.orders.find((o) => o.id === item.orderId);
-        const orderItem = order?.items.find((i) => i.id === item.orderItemId);
+        const orderItem = (order?.items ?? []).find((i) => i.id === item.orderItemId);
         if (order && orderItem && orderItem.quantityDispensed === 0) {
           orderItem.status = 'rejected';
           orderItem.canDispense = false;

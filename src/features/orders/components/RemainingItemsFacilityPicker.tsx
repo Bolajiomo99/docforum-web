@@ -97,7 +97,7 @@ export function RemainingItemsFacilityPicker({
         </ul>
 
         <div className={styles.paymentNote} role="note">
-          <strong>Payment:</strong> {order.payment.rule} The second facility is paid only for the
+          <strong>Payment:</strong> {order.payment?.rule} The second facility is paid only for the
           items it dispenses.
         </div>
 

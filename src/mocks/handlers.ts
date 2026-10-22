@@ -28,7 +28,7 @@ export const handlers = [
   ...queueHandlers,
   ...messagingHandlers,
   ...insightsHandlers,
-  ...ordersHandlers,
+  ...orderHandlers,
   ...facilityHandlers,
   ...facilityTeamHandlers,
   ...orderHandlers,

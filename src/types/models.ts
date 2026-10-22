@@ -235,6 +235,17 @@ interface OrderVersionBase {
   issuedByDoctorName?: string | null;
   requiresFacilitySelection: boolean;
   selectedFacility?: OrderFacilitySummary | null;
+  // --- Partial fulfilment (issue #54, docforum-core#73 assumed) -----------
+  // Optional so main's W2 order screens keep compiling; the partial-fulfilment
+  // screens in `features/orders` read these.
+  patientName?: string;
+  medicationOrTest?: string;
+  expiresAt?: string;
+  facilityId?: string | null;
+  facilityName?: string | null;
+  fulfillmentStatus?: PartialFulfillmentStatus;
+  items?: OrderItem[];
+  payment?: OrderPaymentSummary;
 }
 
 export interface Prescription extends OrderVersionBase {
@@ -568,6 +579,73 @@ export interface FulfillmentQueueItem {
   receivedAt: string;
   attribution?: FulfillmentActionAttribution | null;
   labResult?: FulfillmentLabResult | null;
+  // --- Partial fulfilment (issue #54, docforum-core#73 assumed) -----------
+  quantityPrescribed?: number;
+  quantityDispensed?: number;
+  quantityOutstanding?: number;
+  unit?: string;
+  canDispense?: boolean;
+  blockedReason?: string | null;
+  dispensedByFacilityId?: string | null;
+  dispensedByFacilityName?: string | null;
+}
+
+// --- Phase W4 — Partial fulfilment (issue #54, depends on
+// docforum-core#73) ---------------------------------------------------------
+// Assumed contract: order-level status is derived from item-level rows.
+// The exact payment-release rule is backend-owned and pending #73; the UI
+// renders `payment.rule` rather than computing/guessing a release amount.
+
+export type PartialFulfillmentStatus =
+  | 'unfulfilled'
+  | 'partially_fulfilled'
+  | 'fulfilled'
+  | 'rejected';
+
+export type OrderItemFulfillmentStatus =
+  | 'pending'
+  | 'partially_dispensed'
+  | 'dispensed'
+  | 'dispensed_elsewhere'
+  | 'rejected';
+
+export interface OrderItem {
+  id: string;
+  orderId: string;
+  name: string;
+  instructions?: string | null;
+  quantityPrescribed: number;
+  quantityDispensed: number;
+  quantityOutstanding: number;
+  unit: string;
+  status: OrderItemFulfillmentStatus;
+  dispensedByFacilityId?: string | null;
+  dispensedByFacilityName?: string | null;
+  dispensedAt?: string | null;
+  routedToFacilityId?: string | null;
+  routedToFacilityName?: string | null;
+  /** Backend-derived: false once another facility dispensed or the
+   * remaining quantity was routed elsewhere. */
+  canDispense: boolean;
+  blockedReason?: string | null;
+}
+
+export interface OrderPaymentSummary {
+  status: 'held' | 'partially_released' | 'released' | 'refunded' | 'none';
+  heldStroops: string;
+  releasedStroops: string;
+  refundedStroops: string;
+  /** Plain-language rule supplied by docforum-core, shown verbatim. */
+  rule: string;
+}
+
+export interface DispenseFulfillmentItemInput {
+  quantity: number;
+}
+
+export interface RouteRemainingItemsInput {
+  facilityId: string;
+  itemIds: string[];
 }
 
 export type FulfillmentStatusUpdate = 'in_progress' | 'fulfilled' | 'rejected';

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '../../../components/Button';
 import { FulfillmentStatusBadge } from '../../../components/FulfillmentStatusBadge';
 import { Spinner } from '../../../components/Spinner';
-import type { OrderItem, PatientOrder } from '../../../types/models';
+import type { OrderItem, OrderPaymentSummary, PatientOrder } from '../../../types/models';
 import { ITEM_STATUS_LABELS } from '../../fulfillment/status';
 import { useOrder } from '../hooks/useOrders';
 import { orderTypeLabel } from './PatientOrdersList';
@@ -19,7 +19,7 @@ function formatDate(value: string | null | undefined): string {
   });
 }
 
-function paymentStatusLabel(status: PatientOrder['payment']['status']): string {
+function paymentStatusLabel(status: OrderPaymentSummary['status']): string {
   switch (status) {
     case 'held':
       return 'Held in escrow';
@@ -118,15 +118,15 @@ export function PatientOrderDetail({ orderId }: { orderId: string }) {
 
   const outstandingItems = useMemo(
     () =>
-      order?.items.filter(
+      (order?.items ?? []).filter(
         (item) => item.quantityOutstanding > 0 && !item.routedToFacilityId,
-      ) ?? [],
+      ),
     [order],
   );
 
-  const hasRoutedItems = order?.items.some((item) => item.routedToFacilityId) ?? false;
+  const hasRoutedItems = (order?.items ?? []).some((item) => item.routedToFacilityId);
   const allDispensed =
-    order?.items.every((item) => item.quantityOutstanding <= 0) ?? false;
+    (order?.items ?? []).every((item) => item.quantityOutstanding <= 0);
 
   if (isLoading) {
     return (
@@ -152,7 +152,7 @@ export function PatientOrderDetail({ orderId }: { orderId: string }) {
 
   const handleRouted = (updated: PatientOrder) => {
     setIsPickerOpen(false);
-    const facilityName = updated.items.find((item) => item.routedToFacilityName)
+    const facilityName = (updated.items ?? []).find((item) => item.routedToFacilityName)
       ?.routedToFacilityName;
     setSuccessMessage(
       facilityName
@@ -178,15 +178,17 @@ export function PatientOrderDetail({ orderId }: { orderId: string }) {
             {order.facilityName ? ` · ${order.facilityName}` : ''}
           </p>
         </div>
-        <FulfillmentStatusBadge status={order.fulfillmentStatus} />
+        <FulfillmentStatusBadge status={order.fulfillmentStatus ?? 'unfulfilled'} />
       </div>
 
       <div className={styles.paymentCallout} role="note">
         <div>
           <strong>Payment implications</strong>
-          <p>{order.payment.rule}</p>
+          <p>{order.payment?.rule ?? 'Payment details are not available for this order.'}</p>
         </div>
-        <span className={styles.paymentStatus}>{paymentStatusLabel(order.payment.status)}</span>
+        <span className={styles.paymentStatus}>
+          {paymentStatusLabel(order.payment?.status ?? 'none')}
+        </span>
       </div>
 
       {successMessage && (
@@ -199,7 +201,7 @@ export function PatientOrderDetail({ orderId }: { orderId: string }) {
         <div className={styles.itemSection}>
           <h2 className={styles.sectionTitle}>Items</h2>
           <ul className={styles.detailItemList}>
-            {order.items.map((item) => (
+            {(order.items ?? []).map((item) => (
               <ItemCard key={item.id} item={item} />
             ))}
           </ul>

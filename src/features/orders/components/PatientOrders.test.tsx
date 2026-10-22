@@ -62,7 +62,7 @@ describe('PatientOrderDetail (#54)', () => {
     expect(
       screen.getByText(/already dispensed by Example Chemist \(fake\)/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(partialOrder.payment.rule)).toBeInTheDocument();
+    expect(screen.getByText(partialOrder.payment?.rule ?? '')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /get remaining items elsewhere/i }),
     ).toBeInTheDocument();
@@ -71,7 +71,7 @@ describe('PatientOrderDetail (#54)', () => {
   it('routes outstanding items to another eligible facility', async () => {
     const routedOrder: PatientOrder = {
       ...partialOrder,
-      items: partialOrder.items.map((item) =>
+      items: (partialOrder.items ?? []).map((item) =>
         item.quantityOutstanding > 0
           ? {
               ...item,
