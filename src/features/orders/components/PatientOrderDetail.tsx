@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '../../../components/Button';
 import { FulfillmentStatusBadge } from '../../../components/FulfillmentStatusBadge';
 import { Spinner } from '../../../components/Spinner';
-import type { OrderItem, OrderPaymentSummary, PatientOrder } from '../../../types/models';
+import type { OrderItemFulfillment, OrderPaymentSummary, PatientOrder } from '../../../types/models';
 import { ITEM_STATUS_LABELS } from '../../fulfillment/status';
 import { useOrder } from '../hooks/useOrders';
 import { orderTypeLabel } from './PatientOrdersList';
@@ -34,7 +34,7 @@ function paymentStatusLabel(status: OrderPaymentSummary['status']): string {
   }
 }
 
-function ItemCard({ item }: { item: OrderItem }) {
+function ItemCard({ item }: { item: OrderItemFulfillment }) {
   const isOutstanding = item.quantityOutstanding > 0;
 
   return (

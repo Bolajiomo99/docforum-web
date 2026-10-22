@@ -1,6 +1,6 @@
 import type {
   FulfillmentQueueItem,
-  OrderItem,
+  OrderItemFulfillment,
   OrderItemFulfillmentStatus,
   PartialFulfillmentStatus,
 } from '../../types/models';
@@ -29,13 +29,13 @@ export function itemFulfillmentStatus(item: FulfillmentQuantity): OrderItemFulfi
 
 /** Order-level status derived from item-level rows (docforum-core#73). */
 export function deriveOrderFulfillmentStatus(
-  items: Array<FulfillmentQuantity | OrderItem>,
+  items: Array<FulfillmentQuantity | OrderItemFulfillment>,
 ): PartialFulfillmentStatus {
   if (items.length === 0) return 'unfulfilled';
 
   const statuses = items.map((item) =>
     'name' in item
-      ? (item as OrderItem).status
+      ? (item as OrderItemFulfillment).status
       : itemFulfillmentStatus(item as FulfillmentQuantity),
   );
 

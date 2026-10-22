@@ -3,7 +3,7 @@ import { ApiError } from '../../../services/api-client';
 import { Button } from '../../../components/Button';
 import { FormError } from '../../../components/FormError';
 import { Spinner } from '../../../components/Spinner';
-import type { OrderItem, PatientOrder } from '../../../types/models';
+import type { OrderItemFulfillment, PatientOrder } from '../../../types/models';
 import {
   useEligibleFacilitiesForRemainingItems,
   useRouteRemainingItems,
@@ -13,7 +13,7 @@ import styles from './PatientOrders.module.css';
 
 interface RemainingItemsFacilityPickerProps {
   order: PatientOrder;
-  items: OrderItem[];
+  items: OrderItemFulfillment[];
   onClose: () => void;
   onRouted: (order: PatientOrder) => void;
 }
