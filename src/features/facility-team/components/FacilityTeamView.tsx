@@ -106,6 +106,9 @@ export function FacilityTeamView({
       <div className={styles.container}>
         <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-12)' }}>
           <Spinner size={24} />
+          <span className="srOnly" role="status">
+            Loading facility team members…
+          </span>
         </div>
       </div>
     );
@@ -140,7 +143,7 @@ export function FacilityTeamView({
   };
 
   return (
-    <div className={styles.container} aria-label="Facility team management">
+    <section className={styles.container} aria-label="Facility team management">
       <header className={styles.header}>
 <div className={styles.headerTitle}>
           <h1>{t('facilityTeam.title', 'Facility team & accounts')}</h1>
@@ -200,6 +203,6 @@ export function FacilityTeamView({
         isPending={inviteMutation.isPending}
         isOwner={isOwner}
       />
-    </div>
+    </section>
   );
 }

@@ -15,6 +15,7 @@ import { ProfileSwitcher } from '../features/dependents/components/ProfileSwitch
 import { Button } from './Button';
 import { Logo } from './Logo';
 import { UnreadBadge } from '../features/messaging/components/UnreadBadge';
+import { OfflineBanner } from './OfflineBanner';
 import { RecordSearch } from '../features/search-records/components/RecordSearch';
 import { PageHeader } from './PageHeader';
 import { Flag } from './Flag';
@@ -124,12 +125,25 @@ export function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const isFirstRender = useRef(true);
 
   const items = useMemo(() => roleNavItems(user?.role ?? null), [user?.role]);
 
   // Close the drawer on route change.
   useEffect(() => {
     setDrawerOpen(false);
+  }, [location.pathname]);
+
+  // SPA route changes otherwise leave focus on the clicked link. Move it
+  // to the main landmark so keyboard/screen-reader users start at the new
+  // content, without stealing focus on first paint.
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    mainRef.current?.focus();
   }, [location.pathname]);
 
   const closeDrawer = useCallback(() => {
@@ -172,6 +186,8 @@ export function Layout() {
       <a href="#main-content" className={styles.skipLink}>
         Skip to content
       </a>
+
+      <OfflineBanner />
 
       <header className={styles.header} role="banner">
         <div className={styles.brandBar}>
@@ -329,7 +345,13 @@ export function Layout() {
         <div className={styles.drawerOverlay} onClick={closeDrawer} aria-hidden="true" />
       )}
 
-      <main className={styles.main} id="main-content" role="main">
+      <main
+        ref={mainRef}
+        className={styles.main}
+        id="main-content"
+        role="main"
+        tabIndex={-1}
+      >
         <PageHeader title={routeTitle(location.pathname)} />
         <ErrorBoundary key={location.pathname} level="route">
           <Outlet context={{}} />
@@ -338,6 +360,9 @@ export function Layout() {
 
       <footer className={styles.footer} role="contentinfo">
         <span>{t('app.footer', 'DocForum — care continuity, escrow-secured fulfillment.')}</span>
+        <Link to="/accessibility" className={styles.navLink}>
+          {t('app.accessibility', 'Accessibility')}
+        </Link>
         <a href="/privacy" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Privacy &amp; analytics</a>
       </footer>
     </div>

@@ -5,10 +5,10 @@ import { FormError } from '../../../components/FormError';
 import { DependentForm } from './DependentForm';
 import { useDependents, useAddDependent, useUpdateDependent } from '../hooks/useDependents';
 import { useT } from '../../../i18n/useT';
-import { useErrorMessage } from '../../../hooks/useErrorText';
-import type { Dependent, DependentInput } from '../../../types/models';
 import { useTimeZone } from '../../../i18n/TimeZoneProvider';
 import { formatDate as formatZonedDate } from '../../../i18n/time-zone';
+import { useErrorMessage } from '../../../hooks/useErrorText';
+import type { Dependent, DependentInput } from '../../../types/models';
 import styles from './DependentsList.module.css';
 
 function formatDate(iso: string, timeZone: string) {
@@ -109,7 +109,11 @@ export function DependentsList() {
                 <span className={styles.relationship}>{d.relationship}</span>
               </div>
               <span className={styles.dob}>
-                {t('dependents.born', 'Born {date}', { date: formatDate(d.dateOfBirth, timeZone) })}
+                <time dateTime={d.dateOfBirth}>
+                  {t('dependents.born', 'Born {date}', {
+                    date: formatDate(d.dateOfBirth, timeZone),
+                  })}
+                </time>
               </span>
               {d.handoverStatus !== 'not_eligible' && (
                 <span className={styles.handover} data-status={d.handoverStatus}>

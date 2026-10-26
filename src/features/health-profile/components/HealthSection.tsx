@@ -101,6 +101,9 @@ export function HealthSection({ section }: Props) {
       {isLoading && (
         <div className={styles.loading}>
           <Spinner size={18} />
+          <span className="srOnly" role="status">
+            Loading {SECTION_LABELS[section].toLowerCase()}…
+          </span>
         </div>
       )}
 
@@ -148,7 +151,8 @@ export function HealthSection({ section }: Props) {
                 <span className={styles.entryName}>{entry.name}</span>
                 {entry.version > 1 && (
                   <span className={styles.version}>
-                    v{entry.version} — updated {formatDate(entry.updatedAt, timeZone)}
+                    v{entry.version} — updated{' '}
+                    <time dateTime={entry.updatedAt}>{formatDate(entry.updatedAt, timeZone)}</time>
                     {entry.previousValue && <span className={styles.prev}> (was: {entry.previousValue})</span>}
                   </span>
                 )}

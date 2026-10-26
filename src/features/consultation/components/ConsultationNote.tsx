@@ -5,9 +5,9 @@ import { useConsultationNote, useSignOffNote, useAddAddendum } from '../hooks/us
 import { useAppointment } from "../../appointment/hooks/useAppointment";
 import { useNavigate } from "react-router-dom";
 import { Button } from '../../../components/Button';
-import { ConsultationOutcomePanel } from './ConsultationOutcomePanel';
 import { useTimeZone } from '../../../i18n/TimeZoneProvider';
 import { formatDateTime as formatZonedDateTime } from '../../../i18n/time-zone';
+import { ConsultationOutcomePanel } from './ConsultationOutcomePanel';
 import styles from './ConsultationNote.module.css';
 
 const NOTE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
@@ -131,8 +131,11 @@ export function ConsultationNote({ appointmentId: appointmentIdProp }: Consultat
             <>
               {editing ? (
                 <>
+                  <label htmlFor="consultation-note-content" className="srOnly">
+                    Consultation note content
+                  </label>
                   <textarea
-                    aria-label="Consultation note draft"
+                    id="consultation-note-content"
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     className={styles.content}
@@ -163,14 +166,22 @@ export function ConsultationNote({ appointmentId: appointmentIdProp }: Consultat
       ) : (
         <>
           <div className={styles.contentReadOnly}>{note.content}</div>
-          <div className={styles.signedBadge}>Signed {formatZonedDateTime(note.signedAt, timeZone, NOTE_TIME_OPTIONS)}</div>
+          <div className={styles.signedBadge}>
+            {t('consultation.signedAt', 'Signed {date}', {
+              date: formatZonedDateTime(note.signedAt, timeZone, NOTE_TIME_OPTIONS),
+            })}
+          </div>
 
-          <h2 className={styles.addendaHeading}>Addenda</h2>
+          <h2 className={styles.addendaHeading}>{t('consultation.addenda', 'Addenda')}</h2>
           <div className={styles.addendumComposer}>
+            <label htmlFor="consultation-addendum" className="srOnly">
+              Addendum content
+            </label>
             <textarea
+              id="consultation-addendum"
               value={addendumContent}
               onChange={(e) => setAddendumContent(e.target.value)}
-              placeholder='{t("consultation.addendumPlaceholder", "Add an addendum…")}'
+              placeholder={t('consultation.addendumPlaceholder', 'Add an addendum…')}
               className={styles.addendumInput}
               spellCheck={false}
             />
