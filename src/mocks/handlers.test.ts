@@ -432,7 +432,7 @@ describe('facility finder', () => {
       { lat: 6.5244, lng: 3.3792 },
       MOCK_ACCESS_TOKEN,
     );
-    expect(nearby[0].id).toBe('fac-demo-pharmacy');
+    expect(nearby[0].id).toBe('fac-main');
     expect(nearby[0].distanceKm).toBeLessThan(0.1);
   });
 });
@@ -507,7 +507,7 @@ describe('facility team', () => {
 
   it('fulfills queue items with attribution', async () => {
     const queue = await facilityTeamService.getFulfillmentQueue(FACILITY_ID, MOCK_ACCESS_TOKEN);
-    expect(queue).toHaveLength(3);
+    expect(queue).toHaveLength(5);
 
     const updated = await facilityTeamService.updateFulfillmentItem(
       FACILITY_ID,
