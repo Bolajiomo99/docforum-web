@@ -152,17 +152,39 @@ envelope, `fullName` is a real column, `role` restricted to `patient`/
 `api-client.ts` (fixed 2026-09-14, alongside the Render connection — the
 real backend's refresh cookie is `SameSite=None; Secure`, cross-site
 between this repo's `github.io` domain and Render's, so it's required for
-the cookie to be sent/received at all). One gap remains:
-- **`POST /auth/refresh` exists on the backend but nothing here calls
-  it.** `auth-store.ts` still has no silent-reauth-on-reload flow — a
-  page refresh loses the session even though the refresh cookie would
-  still be valid. Tracked, not built (Phase W1 was scoped to
-  signup/login only).
+the cookie to be sent/received at all). Session restore on reload landed
+2026-10-20 (issue #9):
+- The boot refresh is `POST /auth/refresh` from `src/services/session.ts`,
+  kicked off by `main.tsx` without blocking first render. `RequireAuth`
+  shows a `Restoring your session…` state while the store's `status` is
+  `resolving`, instead of bouncing a signed-in user to `/login`.
+- A `401` on an authenticated request triggers **one** refresh and one
+  retry. Concurrent 401s share the same in-flight promise in
+  `api-client.ts` (`refreshSession`), because docforum-core rotates the
+  refresh cookie on every call.
+- `docforum-core`'s Phase 8 CSRF contract means refresh/logout also need
+  the per-session `csrfToken` in `X-CSRF-Token`. That is the only value
+  persisted across reloads (first-party `docforum_csrf` cookie) — see
+  "CSRF token storage" below. Access and refresh tokens remain in memory /
+  the backend's httpOnly cookie.
 - Local-dev-only caveat inherited from the backend: its refresh cookie is
   `sameSite: 'lax'`/`secure: false`, which may not survive true
   cross-origin (different ports) `fetch` + `credentials: 'include'` in
   every browser — not verified end-to-end. See `docforum-core`'s
   `docs/api/README.md`.
+
+### CSRF token storage (issue #9, docforum-core Phase 8 #37)
+`/auth/refresh` and `/auth/logout` are cookie-authenticated, so
+docforum-core requires the session's `csrfToken` (returned in the
+login/signup/refresh body) in `X-CSRF-Token`. On reload the in-memory copy
+is gone; without persisting it, silent re-auth is impossible. The token is
+therefore kept in a first-party `docforum_csrf` cookie (`csrf-storage.ts`),
+never in localStorage/sessionStorage and never as the httpOnly refresh
+token. It is not a credential on its own: the refresh cookie is still
+required alongside it, and JS-readable CSRF tokens are the standard
+double-submit pattern. The access token stays in memory; the refresh token
+stays in docforum-core's httpOnly cookie.
+
 
 ## Known assumptions
 

@@ -5,6 +5,7 @@ import { Skeleton } from '../../../components/states/Skeleton';
 import { useFormat } from '../../../i18n/useFormat';
 import { useErrorMessage } from '../../../hooks/useErrorText';
 import { usePaymentIntent, useFundPaymentIntent, useReleasePaymentIntent, useRefundPaymentIntent } from '../hooks/usePaymentIntent';
+import { contractUrl, transactionUrl } from '../explorer';
 import type { PaymentIntentStatus } from '../../../types/models';
 
 const NEXT_ACTION: Record<PaymentIntentStatus, string | null> = {
@@ -44,6 +45,9 @@ export function PaymentIntentPanel({ intentId }: { intentId: string }) {
   const intent = intentQuery.data;
   if (!intent) return null;
 
+  const txUrl = transactionUrl(intent.stellarTxHash);
+  const contractLink = contractUrl(intent.sorobanContractId);
+
   const pendingError = fundMutation.error ?? releaseMutation.error ?? refundMutation.error;
   const actionError = errorMessage(pendingError);
 
@@ -72,7 +76,27 @@ export function PaymentIntentPanel({ intentId }: { intentId: string }) {
           <>
             <dt>Last transaction</dt>
             <dd>
-              <code>{intent.stellarTxHash}</code>
+              {txUrl ? (
+                <a href={txUrl} target="_blank" rel="noopener noreferrer">
+                  <code>{intent.stellarTxHash}</code>
+                </a>
+              ) : (
+                <code>{intent.stellarTxHash}</code>
+              )}
+            </dd>
+          </>
+        )}
+        {intent.sorobanContractId && (
+          <>
+            <dt>Soroban contract</dt>
+            <dd>
+              {contractLink ? (
+                <a href={contractLink} target="_blank" rel="noopener noreferrer">
+                  <code>{intent.sorobanContractId}</code>
+                </a>
+              ) : (
+                <code>{intent.sorobanContractId}</code>
+              )}
             </dd>
           </>
         )}

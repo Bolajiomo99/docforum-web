@@ -4,7 +4,7 @@
 import type { Schemas } from '@docforum/api-client';
 import { api, apiFetch } from './api-client';
 
-export type AuthSession = Schemas['AuthSession'];
+export type AuthSession = Schemas['AuthSession'] & { csrfToken?: string };
 export type SignupInput = Schemas['SignupInput'];
 export type LoginInput = Schemas['LoginInput'];
 
@@ -16,7 +16,10 @@ export function login(input: LoginInput): Promise<AuthSession> {
   return api.auth.login(input);
 }
 
-export function logout(accessToken: string): Promise<void> {
+export function logout(accessToken: string, csrfToken?: string | null): Promise<void> {
+  if (csrfToken) {
+    return apiFetch<void>('/auth/logout', { method: 'POST', accessToken, csrfToken });
+  }
   return api.auth.logout({ accessToken });
 }
 
