@@ -24,7 +24,9 @@ type QueueFilter = 'all' | 'active' | 'done';
 const STATUS_LABELS: Record<FulfillmentQueueItem['status'], string> = {
   pending: 'Pending',
   in_progress: 'In progress',
+  partially_dispensed: 'Partially dispensed',
   fulfilled: 'Fulfilled',
+  dispensed_elsewhere: 'Dispensed elsewhere',
   rejected: 'Rejected',
 };
 

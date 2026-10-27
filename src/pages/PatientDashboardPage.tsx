@@ -14,6 +14,8 @@ import { FacilityFinderPage } from './FacilityFinderPage';
 import { CareThreadPage } from './CareThreadPage';
 import { OrdersPage } from './OrdersPage';
 import { OrderDetailPage } from './OrderDetailPage';
+import { PatientOrdersPage } from './PatientOrdersPage';
+import { PatientOrderDetailPage } from './PatientOrderDetailPage';
 import { MessageThreadPage } from './MessageThreadPage';
 import { useProfileBootstrap } from '../features/patients/hooks/useProfileBootstrap';
 import { useT } from '../i18n/useT';
@@ -100,6 +102,8 @@ export function PatientDashboardPage() {
   return (
     <Routes>
       <Route index element={<PatientHome />} />
+      <Route path="orders" element={<PatientOrdersPage />} />
+      <Route path="orders/:orderId" element={<PatientOrderDetailPage />} />
       <Route path="dependents" element={<DependentsPage />} />
       <Route path="health" element={<HealthProfilePage />} />
       <Route path="facilities" element={<FacilityFinderPage />} />
