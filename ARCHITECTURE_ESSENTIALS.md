@@ -732,22 +732,109 @@ server strips it). The full thread UX (optimistic send, live updates,
 per-side layout) is #22's scope — `MessageThread` here is a minimal shared
 shell so the attachment composer/preview have a real home.
 
-### Facility settings — location, opening details & price list (issue #56, docforum-core#74/#127)
-Both `docforum-core` issues this depends on (#74 facility location/distance-sorted
-selection, #127 facility price lists used to price PaymentIntents) are still
-pending, so the shapes below are **assumed** and mirrored in `models.ts` under
-"Facility settings, location & price list". Reconcile once those land.
-- `GET /facilities/:facilityId/settings` → `FacilitySettings`
-  - `FacilitySettings` = `{facilityId, name, type, address, city, latitude, longitude, phone, email, openingHours, updatedAt}`.
-  - `openingHours` is always the full seven `Weekday` entries (`monday`…`sunday`), each `{day, closed, opensAt, closesAt}` where `opensAt`/`closesAt` are `HH:MM` local strings or `null` when closed.
-- `PATCH /facilities/:facilityId/settings` (body: `FacilitySettingsInput` = the editable subset `{address, city, latitude, longitude, phone, email, openingHours}`) → the saved `FacilitySettings`. Server is assumed to reject out-of-range coordinates (`latitude` −90…90, `longitude` −180…180) and missing required fields with `400`.
-- `GET /catalog/items?query=` → `CatalogItem[]`. `query` matches item name or code; empty query returns the catalog. `CatalogItem` = `{code, name, type, description?}` where `code` is the stable id stored on a `FacilityPrice`.
-- `GET /facilities/:facilityId/prices` → `FacilityPrice[]` (all versions, unordered). `FacilityPrice` = `{id, facilityId, catalogItemCode, catalogItemName, asset, amountStroops, effectiveFrom, createdAt}`.
-  - Price versions are immutable. The row effective latest on or before now is the *current* price; future rows are *scheduled*; older rows are *superseded*. `features/facility-settings/components/PriceListEditor.tsx` derives those labels client-side.
-- `POST /facilities/:facilityId/prices` (body: `FacilityPriceInput` = `{catalogItemCode, asset, amountStroops, effectiveFrom}`) → the created `FacilityPrice`. `amountStroops` is the raw BigInt-safe integer string (1 XLM/USDC = 10,000,000 stroops).
-- **Decimal handling:** amounts are entered as decimals (both assets settle to 7 decimals, `ASSET_DECIMALS`) and converted without floating point via `parseAssetAmount` in `features/facility-settings/validation.ts`; more than 7 decimals, negatives, zero and non-numeric input are rejected client-side before any request. The server is presumed to re-validate.
-- **Existing payments are never repriced (edge case):** changing a price creates a new version for *future* PaymentIntents only. Intents already created keep the amount snapshotted at creation time (docforum-core#127). The price-list UI states this explicitly, and no UI path here mutates an existing intent.
-- **Keyboard-accessible map alternative (edge case):** the map pin is a click-to-move convenience only; the always-visible latitude/longitude fields are the accessible alternative, and the map region's `aria-label` points users to them.
+## Preview builds for pull requests (issue #104)
+Every PR is built in mock-API mode and attached to the PR as a downloadable
+artifact. It is never published to GitHub Pages or any other shared origin.
+
+- **No shared-origin publishing.** A PR controls its own build (`package.json`,
+  `vite.config.ts`, the build commands), so serving its `dist/` from
+  `docforum.github.io` would let a contributor run arbitrary JavaScript on the
+  same origin as the real app. The build job uploads a private artifact
+  instead; reviewers download and serve it locally. `check:preview` is a
+  quality gate, **not** the security boundary — the PR controls that script
+  too. Not publishing the build is what makes a malicious PR harmless.
+- **Fork safety is structural, not conditional.** `pr-preview-build.yml` runs
+  on `pull_request` (read-only token, no secrets) and only produces an
+  artifact. `pr-preview-comment.yml` runs on `workflow_run` with write access
+  but never checks out or executes PR code — it lists the run's artifacts and
+  upserts one comment. It resolves the PR from the run's head SHA/branch, so
+  fork PRs work even though GitHub leaves `workflow_run.pull_requests` empty.
+- **Automatic expiry, no cleanup workflow.** Artifacts expire after 14 days,
+  so there is no `gh-pages` branch and no scheduled deletion job.
+- **Mock mode in a production build.** `main.tsx` enables the mock API for a
+  DEV build with `VITE_ENABLE_MOCKS=true` (local dev) or, outside DEV, when
+  `VITE_PREVIEW_MOCKS=true` — only the preview workflow sets the latter. A
+  normal `npm run build` still cannot contain mock code, and
+  `npm run check:dist` still proves it.
+- **Never a real backend.** Previews build with
+  `VITE_API_BASE_URL=https://mock-api.invalid` (a reserved-invalid host) and
+  `VITE_SENTRY_DSN` empty. `scripts/check-preview-dist.mjs`
+  (`npm run check:preview`) fails the build if the mock markers are missing
+  or if the real Pages/Render origins appear anywhere in `dist/`.
+- **Main deploy unchanged.** `deploy-pages.yml` keeps `contents: read` and
+  publishes main with `actions/deploy-pages`; the preview flow never touches
+  it.
+
+## Testing utilities & coverage gate (issue #105)
+- `src/test/render.tsx` — `renderWithProviders(ui, { route, role, session })`
+  wraps a component in a fresh `QueryClient` (retries off, so a failing query
+  fails the test), a `MemoryRouter` at a chosen route, and an optional
+  signed-in role. `signInAs(role)` and `resetTestStores()` are exported for
+  tests that set up state directly; `render` stays as the plain entry point
+  used by the existing suites.
+- `src/test/factories.ts` — typed factories per model. Ids come from a
+  deterministic counter and timestamps from a fixed clock, so assertions on
+  generated ids stay stable (`resetFactorySeq()` resets the counter).
+- `src/test/server.ts` — a single MSW server over `src/mocks/handlers.ts`,
+  started/reset/closed once per run in `src/test/setup.ts` with
+  `onUnhandledRequest: 'bypass'` (so the many `vi.mock(service)` tests keep
+  working). `src/mocks/handlers.test.ts` shares this server instead of
+  creating a second one — two MSW servers in one worker double-intercept
+  requests.
+- **Coverage gate:** `npm run test:coverage` (v8) measures
+  `src/features/**` and `src/services/**` and enforces the thresholds in
+  `vite.config.ts`; CI runs that instead of plain `npm test`. Thresholds are
+  the floor measured when they were last raised — raise, never lower.
+
+### Shared loading, empty and error states (issue #106)
+`src/components/states/` is the one place these live; screens do not hand-roll
+them:
+
+- `Skeleton` — placeholder bars, announced through `role="status"` with a
+  visually hidden label. The pulse stops entirely under
+  `prefers-reduced-motion: reduce` (a static outline, never a blank screen).
+- `EmptyState` — the `action` prop is **required**, so an empty state always
+  offers the next step (a link when it navigates, a button otherwise).
+- `InlineError` — a failed section inside a working screen; optional retry.
+- `PageError` — a route whose primary query failed; retry plus an optional
+  way out.
+- `QueryState` — picks skeleton / error / empty / content from a React Query
+  result. Only the **first** load shows a skeleton; a background refetch
+  keeps the previous rows on screen. `queryErrorMessage()` turns
+  `ApiError`/`ApiTimeoutError` into patient-facing copy.
+
+Empty states added in this change deliberately keep the copy existing tests
+assert on (e.g. "No open disputes…", "docforum-core has no background jobs
+registered."), so the visual change does not silently rewrite product text.
+
+## Known assumptions (issue #107) — notification centre
+Assumed contract: `docforum-core`#93 (Notification model, provider-agnostic
+dispatch interface and the in-app inbox API) has not landed. Shapes mirror
+`src/types/models.ts` ("Notification centre").
+
+- `GET /notifications?cursor=&limit=` → `{items, nextCursor, unreadCount}`,
+  newest first. `unreadCount` is the **inbox-wide** total, not the page's,
+  so the bell badge is correct before every page is loaded. The UI never
+  counts loaded rows for the badge.
+- `POST /notifications/:id/read` → the updated `Notification`.
+- `POST /notifications/read-all` → `{updated, unreadCount}`.
+- `GET /notifications/stream-ticket` → `{ticket, streamPath, expiresAt}`.
+  The SSE URL carries the **ticket, never the access token**: `EventSource`
+  cannot send an Authorization header, and a bearer token in a URL leaks into
+  logs/history/Referer. The ticket is single-use and short-lived.
+- Stream events are `notification` (`{notification, unreadCount}`) and `read`
+  (`{notificationIds, unreadCount}`). `parseStreamEvent` ignores malformed or
+  unknown messages instead of tearing down the stream, and the hook stops
+  reconnecting after two attempts so a blocked proxy cannot cause a retry
+  storm — the 60 s refetch in `useNotifications` is the fallback.
+- `Notification.kind` is open-ended: known kinds map to an icon and a
+  role-aware deep link (`notification-meta.ts`); unknown kinds render a
+  generic bell + "Update" chip and link only to a payload `link` that passes
+  `safeAppPath` (app-relative only — no protocol-relative or absolute URLs, so
+  a hostile payload cannot become an open redirect).
+- **PHI-light by design:** `title`/`body` are display strings written by the
+  backend, rendered as text only. Cross-tab broadcasts carry ids and the same
+  payload the other tab already has; nothing is persisted in localStorage.
 
 ## Roadmap / status
 See `ROADMAP.md` in this repo, and Phase 7 in `docforum-core`'s

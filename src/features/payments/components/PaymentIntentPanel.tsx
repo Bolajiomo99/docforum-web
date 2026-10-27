@@ -1,5 +1,7 @@
 import { Button } from '../../../components/Button';
 import { FormError } from '../../../components/FormError';
+import { InlineError } from '../../../components/states/InlineError';
+import { Skeleton } from '../../../components/states/Skeleton';
 import { useFormat } from '../../../i18n/useFormat';
 import { useErrorMessage } from '../../../hooks/useErrorText';
 import { usePaymentIntent, useFundPaymentIntent, useReleasePaymentIntent, useRefundPaymentIntent } from '../hooks/usePaymentIntent';
@@ -28,9 +30,15 @@ export function PaymentIntentPanel({ intentId }: { intentId: string }) {
   const refundMutation = useRefundPaymentIntent();
   const errorMessage = useErrorMessage();
 
-  if (intentQuery.isLoading) return <p>Loading…</p>;
+  if (intentQuery.isLoading) return <Skeleton lines={3} label="Loading payment intent" />;
   if (intentQuery.isError) {
-    return <FormError message={errorMessage(intentQuery.error)} />;
+    return (
+      <InlineError
+        title="This payment intent couldn't be loaded"
+        message={errorMessage(intentQuery.error) ?? 'Could not load this payment intent.'}
+        onRetry={() => void intentQuery.refetch()}
+      />
+    );
   }
 
   const intent = intentQuery.data;
