@@ -23,6 +23,19 @@ API" for the one documented local-dev cookie caveat.
   for all three roles (facility users just don't self-register). 14 tests
   passing (`npm test`), including one that asserts facility is never
   offered at signup.
+- [x] Invite landing + redemption for admins and facility staff. Tracked
+  as [issue #81](https://github.com/DocForum/docforum-web/issues/81)
+  (High, 200 pts) — `InvitePage` at `/invite?token=` +
+  `src/features/invite/`. Validates the token, shows the inviting
+  organisation, role and inviter, and creates the account with the
+  invite's role (never a form field, never in the request payload) or
+  lets an already-signed-in user accept with one click (existing users
+  are routed through `/login` and back to the invite via router state).
+  Clear expired / revoked / already-used / not-found states. The token
+  is read from the URL once and immediately stripped. **Built against
+  assumed shapes:** docforum-core#39 (admin invites) and #75 (facility
+  staff invites) haven't landed — see `ARCHITECTURE_ESSENTIALS.md`
+  "Known assumptions".
 - [x] Idle timeout & automatic sign-out for shared devices. Tracked as
   [issue #82](https://github.com/DocForum/docforum-web/issues/82)
   (High, 200 pts) — `src/hooks/idle-timeout.ts` (pure timestamp logic) +
@@ -537,6 +550,31 @@ Admin-only screens beyond payments. Everything goes through `docforum-core`'s ad
   - `#52 Scan-to-verify orders with device camera`: dedicated verification page (`/facility/verify`) enabling facility staff to scan order QR codes via device camera or enter tokens manually. Uses native `BarcodeDetector` API with fallback; guarantees complete media stream track teardown on screen unmount/exit. Dispatches to `POST /facilities/me/verify-order` and cleanly displays all 5 result states (`valid`, `superseded`, `expired`, `fulfilled`, `not_eligible`) alongside minimal clinical order summaries. Valid results feature an immediate CTA to jump into fulfillment (`/facility?orderId=...`). Surfaces HTTP 429 rate-limit protection against enumeration.
   - `#53 Facility payout ledger with escrow terms`: dedicated payments page (`/facility/payments`) displaying held, released, and refunded totals for both XLM and USDC. Uses BigInt-safe math (`formatStroops`) for Stellar 7-decimal stroop precision. Renders cursor-paginated escrow ledger with plain-language terms (releaser rules and refund deadline countdowns) adhering to threat model T8. Prominently flags approaching refund deadlines (< 48h) on unfulfilled orders. Integrates direct deep links to Stellar Expert testnet explorer for funding, release, and refund transactions.
   - Updated `ARCHITECTURE_ESSENTIALS.md` "Known assumptions" and `ROADMAP.md`. 26 test files and 124/124 tests passing; typecheck and build green. Captured desktop and mobile screenshots into `screenshots/`.
+- 2026-10-19 — Built invitation redemption for admins & facility staff
+  (#81, PRD OQ-2): `InvitePage` at `/#/invite?token=` that validates the
+  token, shows the inviting organisation, role and inviter, and drives
+  both acceptance paths — new-user account creation (email locked to
+  the invite; role comes from the invite and is never a form field or a
+  request field) and existing-user accept (one click when already signed
+  in, or through `/login` and straight back to the invite via router
+  state). Clear expired / revoked / already-used / not-found states. The
+  token is read from the URL once and immediately stripped, so the
+  credential never lingers in the address bar or history; nothing is
+  persisted to storage. New: `AccountInvite`/`InviteRole` types in
+  `models.ts`, `getInvite`/`acceptInvite` in `auth-service.ts`,
+  `src/features/invite/`, the `/invite` route, and MSW mock handlers
+  with demo tokens (`admin-demo`, `expired-demo`, `revoked-demo`,
+  `used-demo`, `missing`). Tests: 13 new — invite detail/state screens,
+  a `?role=admin` URL-tampering test proving the role and payload stay
+  server-derived, the login round trip, and the bearer token on
+  existing-user accept — plus the signup test extended to assert
+  facility AND admin are never offered at self-serve signup.
+  `ARCHITECTURE_ESSENTIALS.md` "Known assumptions" updated with the
+  assumed contract (pending docforum-core#39/#75). Screenshots captured
+  into `screenshots/`.
+
+
+
 - 2026-10-20 — Phase W7 React Query key factory and cache invalidation conventions (#122): `src/query-keys.ts` owns every cache key as a typed per-resource factory (roots, profile-scoped lists, sibling flag keys preserved) and `src/invalidations.ts` is the documented mutation → keys map with an `invalidateFor` helper; every query/mutation hook in the tree migrated off ad-hoc arrays — including the ones merged to `main` after this branch was cut (appointments, appointment queue/detail, patient chart, abnormal results, calendar feed, payment history, access log). Behavior added: payment fund/release/refund also invalidates the facility ledgers whose held/released totals moved, confirmed visit actions refresh the dashboard appointment list + queue, and every write invalidates the narrowest true key (profile- and section-scoped for health, per-sub-list for facility team). 61 test files and 532/532 tests passing; typecheck, build and check:dist green. No API shapes assumed; no screen changed, so no screenshots.
 - 2026-10-20 — Hardened the API client (#123): every request now has a timeout — `DEFAULT_TIMEOUT_MS` (60 s, deliberately longer than docforum-core's ~1 minute cold start so the 4 s slow-request hint describes a wait that then succeeds) and `SLOW_REQUEST_TIMEOUT_MS` (120 s) for data-export create/download and admin job runs — failing with a typed `ApiTimeoutError` distinct from `ApiError` and from an abort. Identical concurrent GETs share one network request and one parsed result (keyed by URL, bearer token and timeout) with independent per-caller cancellation; mutations are never de-duplicated. Every query-serving service function takes an optional `AbortSignal` and every `queryFn` passes React Query's signal through, so navigating away stops the request; catch-all fallbacks rethrow aborts/timeouts so a cancelled query never caches placeholder data (`useCareThreads`, `useFacilityLedger`). The shared `QueryClient` retries transient failures once and never a cancellation (`isAbortError`). Documented in `ARCHITECTURE_ESSENTIALS.md` "API client behaviour". After merging `main`, the services that landed there (access log, appointment detail/list/check-in queue, calendar feed, patient chart, payment history, abnormal results, doctor today's intake, patient orders + qualified facilities, facility fulfillment queue) take and thread the same signal, and the multipart upload helper `apiFetchForm` rides the same timeout/abort plumbing (still never de-duplicated, still no `Content-Type` so the browser keeps the boundary). 68 test files and 584/584 tests passing (27 new on this branch: timeout, abort, de-dup, mutation-non-sharing, service signal wiring, slow-endpoint budget, multipart upload); typecheck, build and `check:dist` green.
 - 2026-10-19 — Added Phase W3 doctor core flow components (`AbnormalResultsInbox`, `CalendarSubscriptionSection`, `PatientChartPanel` + `/doctor/patient-chart/:patientProfileId`) and resolved TypeScript typecheck/JSX errors across `App.tsx`, `ConsultationNote.tsx`, `PatientChartPanel.tsx`, `usePatientChart.ts`, `AbnormalResultsInbox.tsx`, and `useCalendar.ts`.
