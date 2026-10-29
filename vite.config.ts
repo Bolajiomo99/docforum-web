@@ -133,6 +133,7 @@ export default defineConfig(({ command }) => {
       exclude: [...configDefaults.exclude, 'e2e/**'],
       environment: 'happy-dom',
       globals: true,
+      include: ['src/**/*.{test,spec}.{ts,tsx}'],
       setupFiles: ['./src/test/setup.ts'],
       // Coverage gate (issue #105). Only the folders that hold product logic
       // are measured: `pages/` and `components/` are mostly composition and

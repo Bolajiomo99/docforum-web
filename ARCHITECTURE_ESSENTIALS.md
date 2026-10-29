@@ -152,17 +152,39 @@ envelope, `fullName` is a real column, `role` restricted to `patient`/
 `api-client.ts` (fixed 2026-09-14, alongside the Render connection — the
 real backend's refresh cookie is `SameSite=None; Secure`, cross-site
 between this repo's `github.io` domain and Render's, so it's required for
-the cookie to be sent/received at all). One gap remains:
-- **`POST /auth/refresh` exists on the backend but nothing here calls
-  it.** `auth-store.ts` still has no silent-reauth-on-reload flow — a
-  page refresh loses the session even though the refresh cookie would
-  still be valid. Tracked, not built (Phase W1 was scoped to
-  signup/login only).
+the cookie to be sent/received at all). Session restore on reload landed
+2026-10-20 (issue #9):
+- The boot refresh is `POST /auth/refresh` from `src/services/session.ts`,
+  kicked off by `main.tsx` without blocking first render. `RequireAuth`
+  shows a `Restoring your session…` state while the store's `status` is
+  `resolving`, instead of bouncing a signed-in user to `/login`.
+- A `401` on an authenticated request triggers **one** refresh and one
+  retry. Concurrent 401s share the same in-flight promise in
+  `api-client.ts` (`refreshSession`), because docforum-core rotates the
+  refresh cookie on every call.
+- `docforum-core`'s Phase 8 CSRF contract means refresh/logout also need
+  the per-session `csrfToken` in `X-CSRF-Token`. That is the only value
+  persisted across reloads (first-party `docforum_csrf` cookie) — see
+  "CSRF token storage" below. Access and refresh tokens remain in memory /
+  the backend's httpOnly cookie.
 - Local-dev-only caveat inherited from the backend: its refresh cookie is
   `sameSite: 'lax'`/`secure: false`, which may not survive true
   cross-origin (different ports) `fetch` + `credentials: 'include'` in
   every browser — not verified end-to-end. See `docforum-core`'s
   `docs/api/README.md`.
+
+### CSRF token storage (issue #9, docforum-core Phase 8 #37)
+`/auth/refresh` and `/auth/logout` are cookie-authenticated, so
+docforum-core requires the session's `csrfToken` (returned in the
+login/signup/refresh body) in `X-CSRF-Token`. On reload the in-memory copy
+is gone; without persisting it, silent re-auth is impossible. The token is
+therefore kept in a first-party `docforum_csrf` cookie (`csrf-storage.ts`),
+never in localStorage/sessionStorage and never as the httpOnly refresh
+token. It is not a credential on its own: the refresh cookie is still
+required alongside it, and JS-readable CSRF tokens are the standard
+double-submit pattern. The access token stays in memory; the refresh token
+stays in docforum-core's httpOnly cookie.
+
 
 ## Known assumptions
 
@@ -477,6 +499,39 @@ assumed and mirrored in `models.ts` under "Phase W6 — Feature flags console".
 - **Validation (client-side, server presumed to re-check):** percentages must be whole numbers 0–100 (no decimals or exponents). Allowlist entries must be UUIDs, lower-cased and de-duplicated, at most 500. Ids already saved on the flag pass through unchecked, so an unexpected server-side id format can't block unrelated edits.
 - **Optimistic updates:** confirming writes the change into the cached list straight away, and the flag shows "Saving…" with its controls disabled until docforum-core answers. On failure only that flag is restored, and only while the cached copy still has the `updatedAt` the save started from. A list snapshot is never restored, because that would undo a save to a different flag that is in flight or already done. Every outcome then refetches the list and the audit page (without awaiting, so a cold start doesn't hold "Saving…").
 - An open dialog compares its flag's `updatedAt` with the live list. If someone else saved in the meantime, it says so, blocks confirming, and offers to start again from the latest values.
+### Invitation redemption — admins & facility staff (issue #81, PRD OQ-2)
+
+Admins and facility staff never self-register; they join through an
+invite link (`/#/invite?token=…`). Everything below is ASSUMED — it
+depends on docforum-core#39 (admin invites) and docforum-core#75
+(facility staff invites), neither of which has landed. Mirrored in
+`src/types/models.ts` as `AccountInvite` / `InviteRole` /
+`AccountInviteStatus`.
+
+- `GET /auth/invites/:token` (unauthenticated — the link itself is the
+  credential) → `AccountInvite` = `{id, email, role: 'facility'|'admin',
+  organisationName, organisationType?, invitedBy?, status:
+  'pending'|'accepted'|'revoked'|'expired', invitedAt, expiresAt}`.
+  `404` = unknown token (also covers a used token the server no longer
+  returns); a recognised-but-consumed invite is assumed to come back as
+  `200` with `status: 'accepted'`.
+- `POST /auth/invites/:token/accept` (body: `{email, fullName?,
+  password?}`) → the same `{user, accessToken}` session envelope as
+  signup/login. A brand-new user sends `fullName` + `password`; an
+  existing user accepts after logging in by sending just `{email}` with
+  their `Authorization: Bearer` token. `email` must match the invite
+  (server-checked; mismatch assumed `422`).
+- **The role is NEVER in the request** — docforum-core derives it from
+  the token, so a tampered client cannot pick a role (PRD OQ-2). Covered
+  by tests, including one that appends `?role=admin` to the invite link
+  and asserts neither the shown role nor the accept payload changes.
+- Frontend behaviour: the token is read from the URL once and
+  immediately stripped (`replace`), so the credential never lingers in
+  the address bar or browser history; the log-in round trip for existing
+  users carries it in React Router state only. Nothing is written to
+  localStorage/sessionStorage (hard rule) — reloading `/invite` shows
+  the invalid-link state and the person simply reopens the link from
+  their email.
 ### Phase W6 — Fulfilment disputes (issue #76, depends on docforum-core#76)
 
 docforum-core#76 (facility-side fulfilment proof and patient receipt
