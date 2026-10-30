@@ -810,7 +810,7 @@ export function createSeedDb(): MockDb {
     },
   ];
 
-  const facilityPrices: FacilityPrice[] = [FACILITY_ID, 'fac-main'].flatMap((facilityId) =>
+  const facilityPrices: FacilityPrice[] = [...new Set([FACILITY_ID, 'fac-main'])].flatMap((facilityId) =>
     priceSeeds.flatMap((seed) =>
       seed.versions.map((version, index) => ({
         id: `prc-${facilityId}-${seed.code}-${index}`,
